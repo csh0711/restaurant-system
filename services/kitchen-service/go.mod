@@ -1,5 +1,3 @@
-module kitchen-service
+module restaurant-system/kitchen-service
 
 go 1.26.2
-
-require github.com/rabbitmq/amqp091-go v1.11.0 // indirect

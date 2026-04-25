@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"order-service/api"
 	"restaurant-system/messaging"
+	"restaurant-system/order-service/api"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -19,13 +23,16 @@ type Server struct {
 	queueName string
 }
 
+const queueName = "orders"
+
 func (s *Server) PostOrders(w http.ResponseWriter, r *http.Request) {
 	var req api.PostOrdersJSONRequestBody
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("[order] received table=%s items=%v", req.TableId, req.Items)
 
 	if req.TableId == "" || len(req.Items) == 0 {
 		http.Error(w, "missing fields", http.StatusBadRequest)
@@ -37,7 +44,8 @@ func (s *Server) PostOrders(w http.ResponseWriter, r *http.Request) {
 		"tableId": req.TableId,
 		"items":   req.Items,
 	}
-	
+
+	log.Printf("[order] publishing orderId=%s", event["orderId"])
 	if err := messaging.PublishJSON(s.channel, s.queueName, event); err != nil {
 		http.Error(w, "failed to publish event", http.StatusInternalServerError)
 		return
@@ -57,9 +65,7 @@ func main() {
 	defer conn.Close()
 	defer ch.Close()
 
-	queueName := "orders"
-
-	if err := messaging.DeclareQueue(ch, "orders"); err != nil {
+	if err := messaging.DeclareQueue(ch, queueName); err != nil {
 		log.Fatalf("queue declare failed: %v", err)
 	}
 
@@ -72,8 +78,31 @@ func main() {
 
 	handler := api.HandlerFromMux(server, router)
 
-	log.Println("Order service running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", handler))
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: handler,
+	}
+
+	go func() {
+		log.Println("Order service running on :8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen error: %v", err)
+		}
+	}()
+
+	// Shutdown handling
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	<-ctx.Done()
+	log.Println("Shutting down order service...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown error: %v", err)
+	}
 }
 
 func getEnv(key, fallback string) string {
