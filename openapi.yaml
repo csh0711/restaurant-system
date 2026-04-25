@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Restaurant Ordering API
+  version: 1.0.0
+
+paths:
+  /orders:
+    post:
+      summary: Create a new order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - tableId
+                - items
+              properties:
+                tableId:
+                  type: string
+                items:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Order created
