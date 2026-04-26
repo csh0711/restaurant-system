@@ -4,6 +4,19 @@ info:
   version: 1.0.0
 
 paths:
+  /menu:
+    get:
+      summary: Get available menu items
+      responses:
+        '200':
+          description: List of menu items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MenuItem'
+
   /orders:
     post:
       summary: Create a new order
@@ -22,7 +35,32 @@ paths:
                 items:
                   type: array
                   items:
-                    type: string
+                    $ref: '#/components/schemas/MenuItem'
       responses:
         '201':
           description: Order created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                  tableId:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MenuItem'
+
+components:
+  schemas:
+    MenuItem:
+      type: string
+      enum:
+        - Caesar Salad
+        - Margherita Pizza
+        - Pasta Carbonara
+        - Beef Burger
+        - Chocolate Fondant
+        - Käsespätzle

@@ -10,10 +10,23 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Defines values for MenuItem.
+const (
+	BeefBurger       MenuItem = "Beef Burger"
+	CaesarSalad      MenuItem = "Caesar Salad"
+	ChocolateFondant MenuItem = "Chocolate Fondant"
+	Käsespätzle      MenuItem = "Käsespätzle"
+	MargheritaPizza  MenuItem = "Margherita Pizza"
+	PastaCarbonara   MenuItem = "Pasta Carbonara"
+)
+
+// MenuItem defines model for MenuItem.
+type MenuItem string
+
 // PostOrdersJSONBody defines parameters for PostOrders.
 type PostOrdersJSONBody struct {
-	Items   []string `json:"items"`
-	TableId string   `json:"tableId"`
+	Items   []MenuItem `json:"items"`
+	TableId string     `json:"tableId"`
 }
 
 // PostOrdersJSONRequestBody defines body for PostOrders for application/json ContentType.
@@ -21,6 +34,9 @@ type PostOrdersJSONRequestBody PostOrdersJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Get available menu items
+	// (GET /menu)
+	GetMenu(w http.ResponseWriter, r *http.Request)
 	// Create a new order
 	// (POST /orders)
 	PostOrders(w http.ResponseWriter, r *http.Request)
@@ -29,6 +45,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Get available menu items
+// (GET /menu)
+func (_ Unimplemented) GetMenu(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Create a new order
 // (POST /orders)
@@ -44,6 +66,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetMenu operation middleware
+func (siw *ServerInterfaceWrapper) GetMenu(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMenu(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // PostOrders operation middleware
 func (siw *ServerInterfaceWrapper) PostOrders(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +210,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/menu", wrapper.GetMenu)
+	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/orders", wrapper.PostOrders)
 	})

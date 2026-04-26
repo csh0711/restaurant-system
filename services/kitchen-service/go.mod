@@ -1,3 +1,5 @@
 module restaurant-system/kitchen-service
 
-go 1.26.2
+go 1.22
+
+require github.com/rabbitmq/amqp091-go v1.11.0

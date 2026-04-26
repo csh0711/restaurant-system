@@ -7,26 +7,13 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"restaurant-system/shared/events"
+	"restaurant-system/shared/infrastructure"
 	"syscall"
 	"time"
 
-	"restaurant-system/messaging"
-
 	amqp "github.com/rabbitmq/amqp091-go"
 )
-
-type OrderEvent struct {
-	OrderID string   `json:"orderId"`
-	TableID string   `json:"tableId"`
-	Items   []string `json:"items"`
-}
-
-type DishPreparedEvent struct {
-	OrderID string   `json:"orderId"`
-	TableID string   `json:"tableId"`
-	Items   []string `json:"items"`
-	Status  string   `json:"status"`
-}
 
 const orderQueue = "orders"
 const preparedQueue = "prepared"
@@ -37,7 +24,7 @@ func main() {
 
 	rabbitURL := getEnv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
-	conn, ch, err := messaging.Connect(rabbitURL)
+	conn, ch, err := infrastructure.Connect(rabbitURL)
 	if err != nil {
 		log.Fatalf("rabbitmq connect failed: %v", err)
 	}
@@ -48,17 +35,17 @@ func main() {
 	defer conn.Close()
 	defer ch.Close()
 
-	if err := messaging.DeclareQueue(ch, orderQueue); err != nil {
+	if err := infrastructure.DeclareQueue(ch, orderQueue); err != nil {
 		log.Fatalf("declare orders queue failed: %v", err)
 	}
-	if err := messaging.DeclareQueue(ch, preparedQueue); err != nil {
+	if err := infrastructure.DeclareQueue(ch, preparedQueue); err != nil {
 		log.Fatalf("declare prepared queue failed: %v", err)
 	}
-	if err := messaging.DeclareQueue(ch, deadLetterQueue); err != nil {
+	if err := infrastructure.DeclareQueue(ch, deadLetterQueue); err != nil {
 		log.Fatalf("declare dlq failed: %v", err)
 	}
 
-	msgs, err := messaging.Consume(ch, orderQueue)
+	msgs, err := infrastructure.Consume(ch, orderQueue)
 	if err != nil {
 		log.Fatalf("consume failed: %v", err)
 	}
@@ -81,7 +68,7 @@ func main() {
 				return
 			}
 
-			var order OrderEvent
+			var order events.OrderEvent
 
 			if err := json.Unmarshal(msg.Body, &order); err != nil {
 				log.Printf("invalid message: %v", err)
@@ -96,14 +83,14 @@ func main() {
 			log.Printf("[kitchen] cooking order=%s duration=%v", order.OrderID, cookTime)
 			time.Sleep(cookTime)
 
-			event := DishPreparedEvent{
+			event := events.DishPreparedEvent{
 				OrderID: order.OrderID,
 				TableID: order.TableID,
 				Items:   order.Items,
 				Status:  "prepared",
 			}
 
-			if err := messaging.PublishJSON(ch, preparedQueue, event); err != nil {
+			if err := infrastructure.PublishJSON(ch, preparedQueue, event); err != nil {
 				log.Printf("failed to publish: %v", err)
 
 				headers := msg.Headers
@@ -144,7 +131,7 @@ func main() {
 				} else {
 					log.Printf("[kitchen] sending to DLQ order=%s", order.OrderID)
 
-					if err := messaging.PublishJSON(ch, deadLetterQueue, order); err != nil {
+					if err := infrastructure.PublishJSON(ch, deadLetterQueue, order); err != nil {
 						log.Printf("dlq publish failed: %v", err)
 						msg.Nack(false, true)
 						continue

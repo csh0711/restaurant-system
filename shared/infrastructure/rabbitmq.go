@@ -1,4 +1,4 @@
-package messaging
+package infrastructure
 
 import (
 	"context"

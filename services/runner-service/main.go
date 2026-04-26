@@ -7,25 +7,11 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"restaurant-system/shared/events"
+	"restaurant-system/shared/infrastructure"
 	"syscall"
 	"time"
-
-	"restaurant-system/messaging"
 )
-
-type DishPreparedEvent struct {
-	OrderID string   `json:"orderId"`
-	TableID string   `json:"tableId"`
-	Items   []string `json:"items"`
-	Status  string   `json:"status"`
-}
-
-type OrderServedEvent struct {
-	OrderID string   `json:"orderId"`
-	TableID string   `json:"tableId"`
-	Items   []string `json:"items"`
-	Status  string   `json:"status"`
-}
 
 const preparedQueue = "prepared"
 const servedQueue = "served"
@@ -35,7 +21,7 @@ func main() {
 
 	rabbitURL := getEnv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
-	conn, ch, err := messaging.Connect(rabbitURL)
+	conn, ch, err := infrastructure.Connect(rabbitURL)
 	if err != nil {
 		log.Fatalf("rabbitmq connect failed: %v", err)
 	}
@@ -46,15 +32,15 @@ func main() {
 	defer conn.Close()
 	defer ch.Close()
 
-	if err := messaging.DeclareQueue(ch, preparedQueue); err != nil {
+	if err := infrastructure.DeclareQueue(ch, preparedQueue); err != nil {
 		log.Fatalf("declare prepared queue failed: %v", err)
 	}
 
-	if err := messaging.DeclareQueue(ch, servedQueue); err != nil {
+	if err := infrastructure.DeclareQueue(ch, servedQueue); err != nil {
 		log.Fatalf("declare served queue failed: %v", err)
 	}
 
-	msgs, err := messaging.Consume(ch, preparedQueue)
+	msgs, err := infrastructure.Consume(ch, preparedQueue)
 	if err != nil {
 		log.Fatalf("consume failed: %v", err)
 	}
@@ -77,7 +63,7 @@ func main() {
 				return
 			}
 
-			var prepared DishPreparedEvent
+			var prepared events.DishPreparedEvent
 
 			if err := json.Unmarshal(msg.Body, &prepared); err != nil {
 				log.Printf("invalid message: %v", err)
@@ -90,14 +76,14 @@ func main() {
 			serveTime := time.Duration(r.Intn(2)+1) * time.Second
 			time.Sleep(serveTime)
 
-			event := OrderServedEvent{
+			event := events.OrderServedEvent{
 				OrderID: prepared.OrderID,
 				TableID: prepared.TableID,
 				Items:   prepared.Items,
 				Status:  "served",
 			}
 
-			if err := messaging.PublishJSON(ch, servedQueue, event); err != nil {
+			if err := infrastructure.PublishJSON(ch, servedQueue, event); err != nil {
 				log.Printf("failed to publish: %v", err)
 				msg.Nack(false, true)
 				continue

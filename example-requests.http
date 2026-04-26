@@ -1,0 +1,11 @@
+###
+GET http://localhost:8080/menu
+
+###
+POST http://localhost:8080/orders
+Content-Type: application/json
+
+{
+  "tableId": "0711",
+  "items": ["Käsespätzle", "Caesar Salad", "Chocolate Fondant"]
+}

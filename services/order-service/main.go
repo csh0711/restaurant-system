@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"restaurant-system/shared/events"
+	"restaurant-system/shared/infrastructure"
+	"restaurant-system/shared/model"
 	"syscall"
 	"time"
 
-	"restaurant-system/messaging"
 	"restaurant-system/order-service/api"
 
 	"github.com/go-chi/chi/v5"
@@ -39,33 +41,55 @@ func (s *Server) PostOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	event := map[string]interface{}{
-		"orderId": uuid.New().String(),
-		"tableId": req.TableId,
-		"items":   req.Items,
+	menuItems := make([]model.MenuItem, 0, len(req.Items))
+	for _, item := range req.Items {
+		menuItem := model.MenuItem(item)
+		if !model.IsValid(menuItem) {
+			http.Error(w, "invalid menu item: "+string(item), http.StatusBadRequest)
+			return
+		}
+		menuItems = append(menuItems, menuItem)
 	}
 
-	log.Printf("[order] publishing orderId=%s", event["orderId"])
-	if err := messaging.PublishJSON(s.channel, s.queueName, event); err != nil {
+	event := events.OrderEvent{
+		OrderID: model.OrderID(uuid.New()),
+		TableID: model.TableID(req.TableId),
+		Items:   menuItems,
+	}
+
+	log.Printf("[order] publishing orderId=%s", event.OrderID)
+	if err := infrastructure.PublishJSON(s.channel, s.queueName, event); err != nil {
 		http.Error(w, "failed to publish event", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(event)
+	json.NewEncoder(w)
+}
+
+func (s *Server) GetMenu(w http.ResponseWriter, _ *http.Request) {
+	items := model.List()
+
+	resp := make([]string, 0, len(items))
+	for _, item := range items {
+		resp = append(resp, string(item))
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func main() {
 	rabbitURL := getEnv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
-	conn, ch, err := messaging.Connect(rabbitURL)
+	conn, ch, err := infrastructure.Connect(rabbitURL)
 	if err != nil {
 		log.Fatalf("rabbitmq connect failed: %v", err)
 	}
 	defer conn.Close()
 	defer ch.Close()
 
-	if err := messaging.DeclareQueue(ch, queueName); err != nil {
+	if err := infrastructure.DeclareQueue(ch, queueName); err != nil {
 		log.Fatalf("queue declare failed: %v", err)
 	}
 
