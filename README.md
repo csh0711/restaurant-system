@@ -38,6 +38,7 @@ Communication between services is handled via **RabbitMQ**.
 - [RabbitMQ](https://www.rabbitmq.com/)
 - [OpenAPI (oapi-codegen)](https://github.com/oapi-codegen/oapi-codegen)
 - [Event-driven architecture](https://en.wikipedia.org/wiki/Event-driven_architecture)
+- [React](https://react.dev/) (prototype frontend)
 
 ---
 
@@ -103,6 +104,24 @@ curl -X POST http://localhost:8080/orders \
 ```
 
 ---
+# 🚀 Run the Frontend
+```bash
+cd frontend
+npm install
+npm start
+```
+
+Open in browser: http://localhost:3000
+
+### ⚠️ Requirements
+- Backend services must be running
+- RabbitMQ must be running
+
+### 💬 Note
+
+The frontend is intentionally lightweight and focuses on demonstrating the end-to-end flow from user interaction to backend processing.
+
+---
 
 # 🧠 Design Decisions
 
@@ -144,3 +163,4 @@ The system intentionally avoids overengineering and focuses on clarity and corre
 - Persistent storage
 - Authentication / authorization 
 - Create GitHub Actions for CI/CD
+- Create a more polished frontend with better UX/UI
