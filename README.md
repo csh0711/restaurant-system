@@ -143,3 +143,4 @@ The system intentionally avoids overengineering and focuses on clarity and corre
 - Observability (tracing / metrics)
 - Persistent storage
 - Authentication / authorization 
+- Create GitHub Actions for CI/CD
