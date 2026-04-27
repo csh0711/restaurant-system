@@ -16,6 +16,7 @@ import (
 	"restaurant-system/order-service/api"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -66,7 +67,7 @@ func (s *Server) PostOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w)
+	json.NewEncoder(w).Encode(event)
 }
 
 func (s *Server) GetMenu(w http.ResponseWriter, _ *http.Request) {
@@ -101,6 +102,12 @@ func main() {
 	}
 
 	router := chi.NewRouter()
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	}))
 
 	handler := api.HandlerFromMux(server, router)
 

@@ -1,11 +1,34 @@
 package model
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+
+	"github.com/google/uuid"
+)
 
 type OrderID uuid.UUID
 
 func (id OrderID) String() string {
 	return uuid.UUID(id).String()
+}
+
+func (id OrderID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(uuid.UUID(id).String())
+}
+
+func (id *OrderID) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	parsed, err := uuid.Parse(s)
+	if err != nil {
+		return err
+	}
+
+	*id = OrderID(parsed)
+	return nil
 }
 
 type TableID string
