@@ -58,9 +58,11 @@ func (s *Server) PostOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[order] publishing orderId=%s", event.OrderID)
-	if err := infrastructure.PublishJSON(s.channel, s.queueName, event); err != nil {
-		http.Error(w, "failed to publish event", http.StatusInternalServerError)
-		return
+	if s.channel != nil {
+		if err := infrastructure.PublishJSON(s.channel, s.queueName, event); err != nil {
+			http.Error(w, "failed to publish event", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
